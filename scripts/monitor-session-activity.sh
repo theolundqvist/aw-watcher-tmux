@@ -49,7 +49,7 @@ log_to_bucket() {
     sess=$1
     git_url=$(git config --get remote.origin.url | sed -r 's/.*(\@|\/\/)(.*)(\:|\/)([^:\/]*)\/([^\/\.]*)\.git/https:\/\/\2\/\4\/\5/')
     title=$session_name
-    if [ -z "$git_url"]; then
+    if [ ! -z "$git_url"]; then
       title=$(basename -s .git `git config --get remote.origin.url`)
     fi
 
