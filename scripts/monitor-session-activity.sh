@@ -15,7 +15,7 @@ HOST=$(get_tmux_option "@aw-watcher-tmux-host" "localhost")
 PORT=$(get_tmux_option "@aw-watcher-tmux-port" "5600")
 PULSETIME=$(get_tmux_option "@aw-watcher-tmux-pulsetime" "120.0")
 
-BUCKET_ID="aw-watcher-tmux"
+BUCKET_ID="aw-watcher-tmux-editor"
 API_URL="http://$HOST:$PORT/api"
 
 ######
@@ -35,12 +35,15 @@ init_bucket() {
     HTTP_CODE=$(curl -X GET "${API_URL}/0/buckets/$BUCKET_ID" -H "accept: application/json" -s -o /dev/null -w %{http_code})
     if (( $HTTP_CODE == 404 )) # not found
     then
-        JSON="{\"client\":\"$BUCKET_ID\",\"type\":\"tmux.sessions\",\"hostname\":\"$(hostname)\"}"
-        # JSON="{\"client\":\"$BUCKET_ID\",\"eventType\":\"app.editor.activity\",\"clientName\":\"aw-watcher-tmux-editor\",\"hostname\":\"$(hostname)\"}"
+        # JSON="{\"client\":\"$BUCKET_ID\",\"type\":\"tmux.sessions\",\"hostname\":\"$(hostname)\"}"
+        JSON="{\"name\":\"${BUCKET_ID}\",\"type\":\"app.editor.activity\",\"client\":\"aw-watcher-tmux-editor\",\"hostname\":\"$(hostname)\"}"
         HTTP_CODE=$(curl -X POST "${API_URL}/0/buckets/$BUCKET_ID" -H "accept: application/json" -H "Content-Type: application/json" -d "$JSON"  -s -o /dev/null -w %{http_code})
         if (( $HTTP_CODE != 200 ))
         then
             echo "ERROR creating bucket"
+            echo $JSON
+            echo $HTTP_CODE
+            
             exit -1
         fi
     fi
@@ -48,14 +51,17 @@ init_bucket() {
 
 log_to_bucket() {
     sess=$1
-    git_url=$(git config --get remote.origin.url | sed -r 's/.*(\@|\/\/)(.*)(\:|\/)([^:\/]*)\/([^\/\.]*)\.git/https:\/\/\2\/\4\/\5/')
-    git_full_name=$(git config --get remote.origin.url | sed -r 's/.*(\@|\/\/)(.*)(\:|\/)([^:\/]*)\/([^\/\.]*)\.git/\4\/\5/')
-    title=$(git config --get remote.origin.url | sed -r 's/.*(\@|\/\/)(.*)(\:|\/)([^:\/]*)\/([^\/\.]*)\.git/\5/')
-    if [ -z "$git_url"]; then
-      title=$(tmux display -t $sess -p '#{session_name}')
-    fi
+    current_path=$(tmux display -t $sess -p '#{pane_current_path}')
+    repo_url=$(cd $current_path && git config --get remote.origin.url | sed -r 's/.*(\@|\/\/)(.*)(\:|\/)([^:\/]*)\/([^\/\.]*)(\.git){0,1}/https:\/\/\2\/\4\/\5/')
+    git_branch=$(cd $current_path && git branch --show-current)
+    git_full_name=$(printf $repo_url | sed -r 's/.*\/(.*)\/(.*)/\1\/\2/')
+    title=$(echo $repo_url | sed -r 's/.*\/(.*)/\1/')
+    [ -z "$title" ] && title=$(tmux display -t $sess -p '#{session_name}')
 
-    DATA=$(tmux display -t $sess -p "{\"title\":\"${title}\",\"git_full_name\":\"${git_full_name}\",\"git_url\":\"${git_url}\", \"session_name\":\"#{session_name}\",\"window_name\":\"#{window_name}\",\"pane_title\":\"#{pane_title}\",\"pane_current_command\":\"#{pane_current_command}\",\"pane_current_path\":\"#{pane_current_path}\"}");
+    ## TODO: dont update if repo is the same, or something
+    DATA=$(tmux display -t $sess -p "{\"title\":\"${title}\",\"repo_url\":\"${repo_url}\", \"session_name\":\"#{session_name}\",\"window_name\":\"#{window_name}\",\"pane_title\":\"#{pane_title}\",\"pane_current_command\":\"#{pane_current_command}\",\"pane_current_path\":\"#{pane_current_path}\", \"project\":\"${git_full_name}\", \"path\":\"${repo_url}\", \"file\":\"${title}/\", \"branch\":\"${git_branch}\"}");
+    ## language: "unknown"
+    ## file: "unknown" // but is set to 
     PAYLOAD="{\"timestamp\":\"$(gdate -Is)\",\"duration\":0,\"data\":$DATA}"
     echo "$PAYLOAD"
     HTTP_CODE=$(curl -X POST "${API_URL}/0/buckets/$BUCKET_ID/heartbeat?pulsetime=$PULSETIME" -H "accept: application/json" -H "Content-Type: application/json" -d "$PAYLOAD" -s -o $TMP_FILE -w %{http_code})
