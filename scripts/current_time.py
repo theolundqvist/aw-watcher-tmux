@@ -149,33 +149,34 @@ def query(regex: str = EXAMPLE_REGEX, save=False, repo_url=None):
             timeperiods, res, break_time, {}
         )
     result = _pretty_timedelta(generous_approx(res[0]["events"], 300))
-    if save:
-        for i, (start, end) in enumerate(timeperiods):
-            # fn = f"~/Documents/hour_logs/hours_{start.date()}_{end.date()}.json"
-            repo_name = re.sub(r".*\/(.*)\/(.*)", r"\1_\2", repo_url)
+    if repo_url is not None:
+        if save:
+            for i, (start, end) in enumerate(timeperiods):
+                # fn = f"~/Documents/hour_logs/hours_{start.date()}_{end.date()}.json"
+                repo_name = re.sub(r".*\/(.*)\/(.*)", r"\1_\2", repo_url)
 
-            fn = f"~/Documents/hours/{start.date().year}/{start.date().month}/{start.date().day}/{repo_name}"
-            fn = os.path.expanduser(fn)
-            os.makedirs(os.path.dirname(fn), exist_ok=True)
-            with open(fn+".json", "w") as f:
-                print(f"Saving events to {fn}.json")
-                name = "tmux-worked-hours-test"
-                events = res[i]['events']
-                buckets = {"buckets": {name: {
-                    "id": name, 
-                    "created": now.isoformat(),
-                    "type": f"com.{name}.test", 
-                    "client":name,
-                    "hostname":"testhost",
-                    "events": events,
-                }}}
-                json.dump(buckets, f, indent=2)
-            with open(fn+".txt", "w") as f:
-                print(f"Saving result to {fn}.txt")
-                f.write(f"{repo_url}\n")
-                f.write(f"{repo_name}\n")
-                f.write(f"{start.date()}\n")
-                f.write(f"{result}\n")
+                fn = f"~/Documents/hours/{start.date().year}/{start.date().month}/{start.date().day}/{repo_name}"
+                fn = os.path.expanduser(fn)
+                os.makedirs(os.path.dirname(fn), exist_ok=True)
+                with open(fn+".json", "w") as f:
+                    print(f"Saving events to {fn}.json")
+                    name = "tmux-worked-hours-test"
+                    events = res[i]['events']
+                    buckets = {"buckets": {name: {
+                        "id": name, 
+                        "created": now.isoformat(),
+                        "type": f"com.{name}.test", 
+                        "client":name,
+                        "hostname":"testhost",
+                        "events": events,
+                    }}}
+                    json.dump(buckets, f, indent=2)
+                with open(fn+".txt", "w") as f:
+                    print(f"Saving result to {fn}.txt")
+                    f.write(f"{repo_url}\n")
+                    f.write(f"{repo_name}\n")
+                    f.write(f"{start.date()}\n")
+                    f.write(f"{result}\n")
 
     return result
 
