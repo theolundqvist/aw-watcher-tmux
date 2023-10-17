@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/opt/homebrew/bin/bash
 
 get_tmux_option() {
   local option_value=$(tmux show-option -gqv "$1");
@@ -48,7 +48,7 @@ init_bucket() {
 log_to_bucket() {
     sess=$1
     DATA=$(tmux display -t $sess -p "{\"title\":\"#{session_name}\",\"session_name\":\"#{session_name}\",\"window_name\":\"#{window_name}\",\"pane_title\":\"#{pane_title}\",\"pane_current_command\":\"#{pane_current_command}\",\"pane_current_path\":\"#{pane_current_path}\"}");
-    PAYLOAD="{\"timestamp\":\"$(date -Is)\",\"duration\":0,\"data\":$DATA}"
+    PAYLOAD="{\"timestamp\":\"$(gdate -Is)\",\"duration\":0,\"data\":$DATA}"
     echo "$PAYLOAD"
     HTTP_CODE=$(curl -X POST "${API_URL}/0/buckets/$BUCKET_ID/heartbeat?pulsetime=$PULSETIME" -H "accept: application/json" -H "Content-Type: application/json" -d "$PAYLOAD" -s -o $TMP_FILE -w %{http_code})
     if (( $HTTP_CODE != 200 )); then
