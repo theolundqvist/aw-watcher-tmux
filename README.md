@@ -1,10 +1,15 @@
+### Fork adds mac compatability.
+
+
+
+
 # aw-watcher-tmux - An activity watcher for tmux
 
 A tmux plugin that allows monitoring activity in sessions and panes with [ActivityWatch](https://activitywatch.net).
 
 Watches for activity in multiple tmux sessions and reports `session_name`, `window_name`, `pane_title`, `pane_current_command`, and `pane_current_path`.
 
-The plugin has been tested on Linux and is expected to work also on macOS and on Windows in Cygwin.
+The plugin has been tested on Linux and macOS and on Windows in Cygwin.
 
 ## How to install
 
@@ -13,10 +18,10 @@ The plugin has been tested on Linux and is expected to work also on macOS and on
 * [ActivityWatch](https://activitywatch.net)
 * curl
 * bash version >= 4.0
-
-#### macOS / Mac OSX
-
-MacOS versions might still being shipped with bash versions < 4.0. In this case you will need to upgrade bash. In [#2#issuecomment-1331496394](https://github.com/akohlbecker/aw-watcher-tmux/issues/2#issuecomment-1331496394) you can find instructions on how to upgrade bash via brew.
+* coreutils (mac)
+```
+brew install bash coreutils curl
+```
 
 ### Preparation
 
@@ -28,7 +33,7 @@ MacOS versions might still being shipped with bash versions < 4.0. In this case 
 1. Add below line to your `~/.tmux.conf` 
 
 ~~~
-set -g @plugin 'akohlbecker/aw-watcher-tmux'
+set -g @plugin 'theolundqvist/aw-watcher-tmux'
 ~~~
 
 2. Press prefix + I (capital i, as in Install) to fetch the plugin and reload the tmux environment. More detailed instructions are found in the [tpm](https://github.com/tmux-plugins/tpm) README.
