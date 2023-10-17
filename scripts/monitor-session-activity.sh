@@ -75,6 +75,12 @@ declare -A act_current
 
 init_bucket
 
+
+### kill all old processes of this script
+kill -9 $(pgrep -f ${BASH_SOURCE[0]} | grep -v $$)
+
+
+
 while [ true ]
 do
     #clear
