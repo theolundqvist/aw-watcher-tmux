@@ -47,7 +47,13 @@ init_bucket() {
 
 log_to_bucket() {
     sess=$1
-    DATA=$(tmux display -t $sess -p "{\"title\":\"#{session_name}\",\"session_name\":\"#{session_name}\",\"window_name\":\"#{window_name}\",\"pane_title\":\"#{pane_title}\",\"pane_current_command\":\"#{pane_current_command}\",\"pane_current_path\":\"#{pane_current_path}\"}");
+    git_url=$(git config --get remote.origin.url | sed -r 's/.*(\@|\/\/)(.*)(\:|\/)([^:\/]*)\/([^\/\.]*)\.git/https:\/\/\2\/\4\/\5/')
+    title=$session_name
+    if [[ "$git_url" == "" ]]; then
+      title=$(basename -s .git `git config --get remote.origin.url`)
+    fi
+
+    DATA=$(tmux display -t $sess -p "{\"title\":\"#{title}\",\"git_url\":\"#{git_url}\", \"session_name\":\"#{session_name}\",\"window_name\":\"#{window_name}\",\"pane_title\":\"#{pane_title}\",\"pane_current_command\":\"#{pane_current_command}\",\"pane_current_path\":\"#{pane_current_path}\"}");
     PAYLOAD="{\"timestamp\":\"$(gdate -Is)\",\"duration\":0,\"data\":$DATA}"
     echo "$PAYLOAD"
     HTTP_CODE=$(curl -X POST "${API_URL}/0/buckets/$BUCKET_ID/heartbeat?pulsetime=$PULSETIME" -H "accept: application/json" -H "Content-Type: application/json" -d "$PAYLOAD" -s -o $TMP_FILE -w %{http_code})
