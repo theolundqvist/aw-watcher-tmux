@@ -36,6 +36,7 @@ init_bucket() {
     if (( $HTTP_CODE == 404 )) # not found
     then
         JSON="{\"client\":\"$BUCKET_ID\",\"type\":\"tmux.sessions\",\"hostname\":\"$(hostname)\"}"
+        # JSON="{\"client\":\"$BUCKET_ID\",\"eventType\":\"app.editor.activity\",\"clientName\":\"aw-watcher-tmux-editor\",\"hostname\":\"$(hostname)\"}"
         HTTP_CODE=$(curl -X POST "${API_URL}/0/buckets/$BUCKET_ID" -H "accept: application/json" -H "Content-Type: application/json" -d "$JSON"  -s -o /dev/null -w %{http_code})
         if (( $HTTP_CODE != 200 ))
         then
@@ -48,12 +49,13 @@ init_bucket() {
 log_to_bucket() {
     sess=$1
     git_url=$(git config --get remote.origin.url | sed -r 's/.*(\@|\/\/)(.*)(\:|\/)([^:\/]*)\/([^\/\.]*)\.git/https:\/\/\2\/\4\/\5/')
-    title=$(tmux display -t $sess -p '#{session_name}')
+    git_full_name=$(git config --get remote.origin.url | sed -r 's/.*(\@|\/\/)(.*)(\:|\/)([^:\/]*)\/([^\/\.]*)\.git/\4\/\5/')
+    title=$(git config --get remote.origin.url | sed -r 's/.*(\@|\/\/)(.*)(\:|\/)([^:\/]*)\/([^\/\.]*)\.git/\5/')
     if [ -z "$git_url"]; then
-      title=$(basename -s .git `git config --get remote.origin.url`)
+      title=$(tmux display -t $sess -p '#{session_name}')
     fi
 
-    DATA=$(tmux display -t $sess -p "{\"title\":\"${title}\",\"git_url\":\"${git_url}\", \"session_name\":\"#{session_name}\",\"window_name\":\"#{window_name}\",\"pane_title\":\"#{pane_title}\",\"pane_current_command\":\"#{pane_current_command}\",\"pane_current_path\":\"#{pane_current_path}\"}");
+    DATA=$(tmux display -t $sess -p "{\"title\":\"${title}\",\"git_full_name\":\"${git_full_name}\",\"git_url\":\"${git_url}\", \"session_name\":\"#{session_name}\",\"window_name\":\"#{window_name}\",\"pane_title\":\"#{pane_title}\",\"pane_current_command\":\"#{pane_current_command}\",\"pane_current_path\":\"#{pane_current_path}\"}");
     PAYLOAD="{\"timestamp\":\"$(gdate -Is)\",\"duration\":0,\"data\":$DATA}"
     echo "$PAYLOAD"
     HTTP_CODE=$(curl -X POST "${API_URL}/0/buckets/$BUCKET_ID/heartbeat?pulsetime=$PULSETIME" -H "accept: application/json" -H "Content-Type: application/json" -d "$PAYLOAD" -s -o $TMP_FILE -w %{http_code})
