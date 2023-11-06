@@ -253,7 +253,7 @@ def save(events, results, timeperiods, repo_url=None, path=None):
         if path is not None: fn = path
         fn = os.path.expanduser(fn)
         os.makedirs(os.path.dirname(fn), exist_ok=True)
-        with open(fn+".json", "w") as f:
+        with open(fn+"-events.json", "w") as f:
             print(f"Saving events to {fn}.json")
             name = "tmux-worked-hours-test"
             buckets = {"buckets": {name: {
@@ -298,7 +298,7 @@ def calc_time(timeperiods, repo_url):
     ok_idle_time = 60 * 5
     results = [generous_approx(w, ok_idle_time) for w in worked]
     total = _pretty_timedelta(sum(results, timedelta()))
-    if args.save: save(worked, results, timeperiods, repo_url=args.repo, path=args.path or None)
+    if args.save: save(worked, sum(results, timedelta()), timeperiods, repo_url=args.repo, path=args.path or None)
     if args.report: 
         for i, (start, stop) in enumerate(timeperiods):
             print(report(worked[i], results[i], start, repo_url), "\n")
