@@ -50,20 +50,22 @@ def generous_approx(events: List[dict], max_break: float) -> timedelta:
         timedelta(),
     )
 
+def event_period(event:dict):
+    start = datetime.fromisoformat(event['timestamp'])
+    end = start + timedelta(seconds=event['duration'])
+    return (start, end)
 
 def cut_and_remove_overlapping(events: List[dict], event: dict) -> List[dict]:
     """
     Makes perfect room for event in events by cutting events that overlap with the event. If an event in events is bigger than event, it is split into two events.
     """
     e = event
-    start = datetime.fromisoformat(e['timestamp'])
-    end = start + timedelta(seconds=e['duration'])
+    (start, end) = event_period(e)
 
     for j in range(len(events)):
         other = events[j]
         if other['duration'] == 0: continue
-        other_start = datetime.fromisoformat(other['timestamp'])
-        other_end = other_start + timedelta(seconds=other['duration'])
+        (other_start, other_end) = event_period(other)
 
         if(start >= other_end or end <= other_start): 
             """ if the event and events event does not overlap """
@@ -94,6 +96,7 @@ def cut_and_remove_overlapping(events: List[dict], event: dict) -> List[dict]:
 
 
 def print_negative_gap(e1, e2, prefix="\nFound negative gap: "):
+    return; # dont need this anymore
     firstEnd = datetime.fromisoformat(e1['timestamp'])+timedelta(seconds=e1['duration']) 
     secondIso = datetime.fromisoformat(e2['timestamp'])
     overlap = (firstEnd-secondIso)
@@ -129,8 +132,9 @@ def remove_negative_gap(events: List[dict]) -> List[dict]:
                 second['timestamp'] = (firstEnd-timedelta(days=2)).isoformat()
             print_negative_gap(first, second, prefix="Fixed negative gap: ")
 
-    if wrong > 0:
-        print("Found ", wrong, " negative gaps out of ", len(events), " events")
+    # if wrong > 0:
+    #     print("Found ", wrong, " negative gaps out of ", len(events), " events")
+    # else: print("No negative gaps found in ", len(events), " events")
     events = [e for e in events if e['duration'] > 0.05]
     return events
 
@@ -142,6 +146,34 @@ def subtract_times(events: List[dict], subtract: List[dict]) -> List[dict]:
     for c in subtract:
         events = cut_and_remove_overlapping(events, c)
     return events
+
+def merge_same_repo(events: List[dict]):
+    """ extend project events to cover web browsing and other activities """
+
+    def next_repo_event(i: int):
+        """ get url of next project, stops if loginwindow found between projects in timeline """
+        for i in range(i, len(events)):
+            data = events[i]["data"]
+            if data.get("app") == "loginwindow": return None;
+            if data.get("git") != None: return events[i];
+        return None 
+
+
+    for i, e in enumerate(events):
+        repo = e["data"].get("git")
+        next = next_repo_event(i+1)
+        if next == None: continue;
+        (start, end) = event_period(e)
+        (nextStart, nextEnd) = event_period(next)
+
+        next_git = next["data"].get("git")
+        if next_git != None:
+            """ mark as work on 'next' project (could be same) """
+            next["duration"] = (nextEnd-end).total_seconds();
+            next["timestamp"] = end.isoformat();
+
+    return events;
+
 
 def filter_work(afk: List[dict], window:List[dict], editor: List[dict], repo_url)-> List[dict]:
     afk = sort_events(afk) 
@@ -156,11 +188,14 @@ def filter_work(afk: List[dict], window:List[dict], editor: List[dict], repo_url
 
     
 
+    """ merge editor events in same repo """
+    work = merge_same_repo(editor+loginwindow)
+
     """ remove all editor time from window """
-    window = subtract_times(events=window, subtract=editor);
+    # window = subtract_times(events=window, subtract=editor);
 
     """ merge window and editor """
-    work = window + editor
+    # work = window + editor
 
     """ remove all afk time from work """
     work = subtract_times(events=work, subtract=afk);
@@ -170,33 +205,40 @@ def filter_work(afk: List[dict], window:List[dict], editor: List[dict], repo_url
 
     """ remove all time from work that is too short """
     work = [e for e in work if e['duration'] > 0.05]
+
     """ TODO: filter based upon repo_url """
+    # 111111aaaaaa111111aaaaaa222222aaaaa1111
+    # 111111111111111111aaaaaa222222aaaaa1111
+    # work = [e for e in work if e["data"].get("git") == repo_url]
+
 
     """ double check no negative gaps """
     work = remove_negative_gap(work)
+    # work = remove_negative_gap(work)
     return work
 
 def get_timeperiods(nbr_days):
-    td1d = timedelta(days=nbr_days)
+    td1d = timedelta(days=1)
     day_offset = timedelta(hours=4)
 
     now = datetime.now().astimezone()
     today = (datetime.combine(now.date(), time()) + day_offset).astimezone()
 
-    # timeperiods = [(today - i * td1d, today - (i - 1) * td1d) for i in range(5)][]
-    timeperiods = [(today, today+td1d)]
+    timeperiods = [(today - i * td1d, today - (i - 1) * td1d) for i in range(nbr_days)]
+    # timeperiods = [(today, today+td1d)]
     timeperiods.reverse()
     return timeperiods
 
 def report(events, result, start, repo_url):
-    res = "date: "+start.date().isoformat()+"\n"
+    res = ""
     # for break_time in [0, 1 * 60, 2 * 60, 5 * 60, 10 * 60]:
+    if result.total_seconds() <= 0.1: return ""
     repo_name = "all"
-    if repo_url is not None: repo_name = re.sub(r".*\/(.*)\/(.*)", r"\1_\2", repo_url)
-    res += f"{repo_url}\n"
-    res += f"{repo_name}\n"
-    res += f"{start.date()}\n"
-    res += f"{_pretty_timedelta(result)}"
+    # if repo_url is not None: repo_name = re.sub(r".*\/(.*)\/(.*)", r"\1_\2", repo_url)
+    # res += f"git: {repo_url}\n"
+    # res += f"name: {repo_name}\n"
+    res += f"date: {start.date()}\n"
+    res += f"total: {str(result).split('.')[0]}"
     return res
 
 def save(events, results, timeperiods, repo_url=None, path=None):
@@ -259,7 +301,7 @@ def calc_time(timeperiods, repo_url):
     if args.save: save(worked, results, timeperiods, repo_url=args.repo, path=args.path or None)
     if args.report: 
         for i, (start, stop) in enumerate(timeperiods):
-            print(report(worked[i], results[i], start, repo_url))
+            print(report(worked[i], results[i], start, repo_url), "\n")
     return (results, total)
 
 
@@ -274,6 +316,7 @@ if __name__ == "__main__":
     parser.add_argument("--report", '-r', help="Report detailed results to the terminal", action='store_true')
     parser.add_argument("--path", '-p', help="Save to this path", type=str)
     parser.add_argument("--verbose", '-v', help="Print more info", action='store_true')
+    parser.add_argument("--days", '-d', help="Number of days in period", type=int)
     args=parser.parse_args()
 
     if args.repo is None: 
@@ -282,7 +325,7 @@ if __name__ == "__main__":
         args.repo = 'https://github.com/'+args.repo
         print("Using repo:", args.repo)
 
-    timeperiods = get_timeperiods(1)
+    timeperiods = get_timeperiods(args.days or 1)
     (results, total) = calc_time(timeperiods, args.repo)
 
 

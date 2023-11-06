@@ -59,7 +59,8 @@ log_to_bucket() {
     [ -z "$title" ] && title=$(tmux display -t $sess -p '#{session_name}')
 
     ## TODO: dont update if repo is the same, or something
-    DATA=$(tmux display -t $sess -p "{\"title\":\"${title}\",\"repo_url\":\"${repo_url}\", \"session_name\":\"#{session_name}\",\"window_name\":\"#{window_name}\",\"pane_title\":\"#{pane_title}\",\"pane_current_command\":\"#{pane_current_command}\",\"pane_current_path\":\"#{pane_current_path}\", \"project\":\"${git_full_name}\", \"path\":\"${repo_url}\", \"file\":\"${title}/\", \"branch\":\"${git_branch}\"}");
+    DATA=$(tmux display -t $sess -p "{\"title\":\"${title}\",\"git\":\"${repo_url}\",\"path\":\"#{pane_current_path}\", \"project\":\"${git_full_name}\", \"branch\":\"${git_branch}\", \"file\":\"\", \"language\":\"\"}");
+    # DATA=$(tmux display -t $sess -p "{\"title\":\"${title}\",\"git\":\"${repo_url}\", \"session_name\":\"#{session_name}\",\"window_name\":\"#{window_name}\",\"pane_title\":\"#{pane_title}\",\"pane_current_command\":\"#{pane_current_command}\",\"pane_current_path\":\"#{pane_current_path}\", \"project\":\"${git_full_name}\", \"file\":\"${title}/\", \"branch\":\"${git_branch}\"}");
     ## language: "unknown"
     ## file: "unknown" // but is set to 
     PAYLOAD="{\"timestamp\":\"$(gdate -Is)\",\"duration\":0,\"data\":$DATA}"
