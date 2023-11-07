@@ -240,32 +240,37 @@ def report(events, result, start, repo_url):
     res += f"total: {str(result).split('.')[0]}"
     return res
 
-def save(events, result, start, repo_url=None, path=None):
+def flatten(l):
+    return [item for sublist in l for item in sublist]
+
+def save(events, timeperiods):
     # fn = f"~/Documents/hour_logs/hours_{start.date()}_{end.date()}.json"
+    events = flatten(events)
     for e in events:
         del e['data']['type']
     repo_name = "all"
-    if repo_url is not None: repo_name = re.sub(r".*\/(.*)\/(.*)", r"\1_\2", repo_url)
+    if args.repo is not None: repo_name = re.sub(r".*\/(.*)\/(.*)", r"\1_\2", args.repo)
 
-    fn = f"~/Documents/hours/{start.date().year}/{start.date().month}/{start.date().day}/{repo_name}"
-    if path is not None: fn = f"{path}/{start.date().day}/{repo_name}"
+    time = str(datetime.now().astimezone().isoformat()).split(".")[0]
+    fn = f"./out/{time}" #f"~/Documents/hours/{start.date().year}/{start.date().month}/{start.date().day}/{repo_name}"
+    if args.path is not None: fn = f"{args.path}/{start.date().day}/{repo_name}"
     fn = os.path.expanduser(fn)
     os.makedirs(os.path.dirname(fn), exist_ok=True)
     with open(fn+"_events.json", "w") as f:
-        print(f"Saving events to {fn}.json")
+        print(f"Saving events to {fn}_events.json")
         name = "tmux-worked-hours-test"
         buckets = {"buckets": {name: {
             "id": name, 
-            "created": datetime.now().astimezone() .isoformat(),
+            "created": datetime.now().isoformat(),
             "type": f"com.{name}.test", 
             "client":name,
             "hostname":"testhost",
             "events": events,
         }}}
         json.dump(buckets, f, indent=2)
-    with open(fn+"_report.txt", "w") as f:
-        print(f"Saving result to {fn}.txt")
-        f.write(report(events, result, start, repo_url))
+    # with open(fn+"_report.txt", "w") as f:
+    #     print(f"Saving result to {fn}.txt")
+    #     f.write(report(events, result, start, repo_url))
 
 def query(timeperiods):
     aw = aw_client.ActivityWatchClient()
@@ -299,8 +304,11 @@ def calc_time(timeperiods, repo_url):
     for i, (start, stop) in enumerate(timeperiods):
         if args.report: 
             print(report(worked[i], results[i], start, repo_url), "\n")
-        if args.save: 
-            save(worked[i], results[i], start, repo_url=args.repo, path=args.path or None)
+        # if args.save: 
+        #     save(worked[i], results[i], start, repo_url=args.repo, path=args.path or None)
+    if args.save:
+        save(worked, timeperiods)
+
     return (results, total)
 
 
