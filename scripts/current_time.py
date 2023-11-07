@@ -187,21 +187,19 @@ def filter_work(afk: List[dict], window:List[dict], editor: List[dict], repo_url
     window = [e for e in window if e['data']['app'] != 'loginwindow']
 
     
+    """ remove all loginwindow time from work """
+    work = subtract_times(events=editor, subtract=loginwindow);
 
     """ merge editor events in same repo """
-    work = merge_same_repo(editor+loginwindow)
+    """ add loginwindow to not merge over it"""
+    work = merge_same_repo(work+loginwindow)
 
-    """ remove all editor time from window """
-    # window = subtract_times(events=window, subtract=editor);
-
-    """ merge window and editor """
-    # work = window + editor
+    """ remove loginwindow"""
+    work = [e for e in work if e['data'].get("app") != "loginwindow"]
 
     """ remove all afk time from work """
     work = subtract_times(events=work, subtract=afk);
 
-    """ remove all loginwindow time from work """
-    work = subtract_times(events=work, subtract=loginwindow);
 
     """ remove all time from work that is too short """
     work = [e for e in work if e['duration'] > 0.05]
@@ -209,7 +207,8 @@ def filter_work(afk: List[dict], window:List[dict], editor: List[dict], repo_url
     """ TODO: filter based upon repo_url """
     # 111111aaaaaa111111aaaaaa222222aaaaa1111
     # 111111111111111111aaaaaa222222aaaaa1111
-    # work = [e for e in work if e["data"].get("git") == repo_url]
+    if repo_url is not None:
+        work = [e for e in work if e["data"].get("git") == repo_url]
 
 
     """ double check no negative gaps """
@@ -217,11 +216,11 @@ def filter_work(afk: List[dict], window:List[dict], editor: List[dict], repo_url
     # work = remove_negative_gap(work)
     return work
 
-def get_timeperiods(nbr_days):
+def get_timeperiods(nbr_days, start=None):
     td1d = timedelta(days=1)
     day_offset = timedelta(hours=4)
 
-    now = datetime.now().astimezone()
+    now = datetime.now().astimezone() if start is None else datetime.fromisoformat(start)
     today = (datetime.combine(now.date(), time()) + day_offset).astimezone()
 
     timeperiods = [(today - i * td1d, today - (i - 1) * td1d) for i in range(nbr_days)]
@@ -241,33 +240,32 @@ def report(events, result, start, repo_url):
     res += f"total: {str(result).split('.')[0]}"
     return res
 
-def save(events, results, timeperiods, repo_url=None, path=None):
+def save(events, result, start, repo_url=None, path=None):
     # fn = f"~/Documents/hour_logs/hours_{start.date()}_{end.date()}.json"
-    for i, (start, end) in enumerate(timeperiods):
-        for e in events[i]:
-            del e['data']['type']
-        repo_name = "all"
-        if repo_url is not None: repo_name = re.sub(r".*\/(.*)\/(.*)", r"\1_\2", repo_url)
+    for e in events:
+        del e['data']['type']
+    repo_name = "all"
+    if repo_url is not None: repo_name = re.sub(r".*\/(.*)\/(.*)", r"\1_\2", repo_url)
 
-        fn = f"~/Documents/hours/{start.date().year}/{start.date().month}/{start.date().day}/{repo_name}"
-        if path is not None: fn = path
-        fn = os.path.expanduser(fn)
-        os.makedirs(os.path.dirname(fn), exist_ok=True)
-        with open(fn+"-events.json", "w") as f:
-            print(f"Saving events to {fn}.json")
-            name = "tmux-worked-hours-test"
-            buckets = {"buckets": {name: {
-                "id": name, 
-                "created": datetime.now().astimezone() .isoformat(),
-                "type": f"com.{name}.test", 
-                "client":name,
-                "hostname":"testhost",
-                "events": events[i],
-            }}}
-            json.dump(buckets, f, indent=2)
-        with open(fn+"-report.txt", "w") as f:
-            print(f"Saving result to {fn}.txt")
-            f.write(report(events, results, start, repo_url))
+    fn = f"~/Documents/hours/{start.date().year}/{start.date().month}/{start.date().day}/{repo_name}"
+    if path is not None: fn = f"{path}/{start.date().day}/{repo_name}"
+    fn = os.path.expanduser(fn)
+    os.makedirs(os.path.dirname(fn), exist_ok=True)
+    with open(fn+"_events.json", "w") as f:
+        print(f"Saving events to {fn}.json")
+        name = "tmux-worked-hours-test"
+        buckets = {"buckets": {name: {
+            "id": name, 
+            "created": datetime.now().astimezone() .isoformat(),
+            "type": f"com.{name}.test", 
+            "client":name,
+            "hostname":"testhost",
+            "events": events,
+        }}}
+        json.dump(buckets, f, indent=2)
+    with open(fn+"_report.txt", "w") as f:
+        print(f"Saving result to {fn}.txt")
+        f.write(report(events, result, start, repo_url))
 
 def query(timeperiods):
     aw = aw_client.ActivityWatchClient()
@@ -298,10 +296,11 @@ def calc_time(timeperiods, repo_url):
     ok_idle_time = 60 * 5
     results = [generous_approx(w, ok_idle_time) for w in worked]
     total = _pretty_timedelta(sum(results, timedelta()))
-    if args.save: save(worked, sum(results, timedelta()), timeperiods, repo_url=args.repo, path=args.path or None)
-    if args.report: 
-        for i, (start, stop) in enumerate(timeperiods):
+    for i, (start, stop) in enumerate(timeperiods):
+        if args.report: 
             print(report(worked[i], results[i], start, repo_url), "\n")
+        if args.save: 
+            save(worked[i], results[i], start, repo_url=args.repo, path=args.path or None)
     return (results, total)
 
 
@@ -317,6 +316,8 @@ if __name__ == "__main__":
     parser.add_argument("--path", '-p', help="Save to this path", type=str)
     parser.add_argument("--verbose", '-v', help="Print more info", action='store_true')
     parser.add_argument("--days", '-d', help="Number of days in period", type=int)
+    parser.add_argument("--date", help="Number of days in period", type=str)
+    parser.add_argument("--export", '-e', help="Save a json of all events", type=str)
     args=parser.parse_args()
 
     if args.repo is None: 
@@ -325,7 +326,7 @@ if __name__ == "__main__":
         args.repo = 'https://github.com/'+args.repo
         print("Using repo:", args.repo)
 
-    timeperiods = get_timeperiods(args.days or 1)
+    timeperiods = get_timeperiods(args.days or 1, start=args.date)
     (results, total) = calc_time(timeperiods, args.repo)
 
 
