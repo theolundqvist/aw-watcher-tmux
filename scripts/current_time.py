@@ -314,11 +314,12 @@ if __name__ == "__main__":
     parser.add_argument("--save", '-s', help="Save detailed results to file", action='store_true')
     parser.add_argument("--report", '-r', help="Report detailed results to the terminal", action='store_true')
     parser.add_argument("--path", '-p', help="Save to this path", type=str)
-    parser.add_argument("--verbose", '-v', help="Print more info", action='store_true')
+    # parser.add_argument("--verbose", '-v', help="Print more info", action='store_true')
     parser.add_argument("--days", '-d', help="Number of days in period", type=int)
     parser.add_argument("--date", help="Number of days in period", type=str)
-    parser.add_argument("--export", '-e', help="Save a json of all events", type=str)
+    # parser.add_argument("--export", '-e', help="Save a json of all events", action="store_true")
     args=parser.parse_args()
+    print(args)
 
     if args.repo is None: 
         print("Using all repos")
