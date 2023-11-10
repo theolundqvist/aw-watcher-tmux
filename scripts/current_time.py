@@ -167,10 +167,12 @@ def merge_same_repo(events: List[dict]):
         (nextStart, nextEnd) = event_period(next)
 
         next_git = next["data"].get("git")
-        if next_git != None:
-            """ mark as work on 'next' project (could be same) """
-            next["duration"] = (nextEnd-end).total_seconds();
-            next["timestamp"] = end.isoformat();
+        if repo == next_git:
+            """ if next event is same repo, extend current event to cover it """
+            e["duration"] = (nextStart-start).total_seconds();
+            # events = cut_and_remove_overlapping()
+            
+            # next["timestamp"] = end.isoformat();
 
     return events;
 
@@ -188,17 +190,18 @@ def filter_work(afk: List[dict], window:List[dict], editor: List[dict], repo_url
 
     
     """ remove all loginwindow time from work """
-    work = subtract_times(events=editor, subtract=loginwindow);
+    # work = subtract_times(events=editor, subtract=loginwindow);
 
     """ merge editor events in same repo """
     """ add loginwindow to not merge over it"""
-    work = merge_same_repo(work+loginwindow)
+    work = merge_same_repo(editor+loginwindow)
 
     """ remove loginwindow"""
     work = [e for e in work if e['data'].get("app") != "loginwindow"]
 
     """ remove all afk time from work """
     work = subtract_times(events=work, subtract=afk);
+    work = subtract_times(events=work, subtract=loginwindow);
 
 
     """ remove all time from work that is too short """
@@ -228,16 +231,47 @@ def get_timeperiods(nbr_days, start=None):
     timeperiods.reverse()
     return timeperiods
 
-def report(events, result, start, repo_url):
+class COL:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+def report(events, result, start, repo_url, header=""):
     res = ""
     # for break_time in [0, 1 * 60, 2 * 60, 5 * 60, 10 * 60]:
     if result.total_seconds() <= 0.1: return ""
-    repo_name = "all"
+    # repo_name = "all"
     # if repo_url is not None: repo_name = re.sub(r".*\/(.*)\/(.*)", r"\1_\2", repo_url)
     # res += f"git: {repo_url}\n"
     # res += f"name: {repo_name}\n"
-    res += f"date: {start.date()}\n"
-    res += f"total: {str(result).split('.')[0]}"
+    if header != "": res += f"  {COL.OKGREEN}{COL.UNDERLINE}{header}{COL.ENDC}\n\n"
+    else: res += f"  {COL.OKGREEN}{COL.UNDERLINE}{start.date().strftime('%A')} - {start.date()}{COL.ENDC}\n\n"
+    if repo_url == None:
+        repos = set([e['data'].get('git') for e in events])
+    else: repos = [repo_url]
+    totals = []
+    for r in repos:
+        work = [e for e in events if e['data'].get('git') == r]
+        totals.append((r,generous_approx(work, 60*5)))
+    totals.sort(key=lambda x: x[1], reverse=True)
+    for (r, total) in totals:
+        res += f"  - {str(total).split('.')[0]}"
+        if r is None or r == "":
+            res += f"   {COL.WARNING}None{COL.ENDC}\n"
+        else:
+            name = re.sub(r".*\/(.*)\/(.*)", r"\1/\2", r)
+            res += f"   {COL.OKCYAN}{name}{COL.ENDC}\n"
+
+
+
+
+    res += f"\n   {COL.BOLD}total:{COL.ENDC} {str(result).split('.')[0]}\n"
     return res
 
 def flatten(l):
@@ -268,9 +302,6 @@ def save(events, timeperiods):
             "events": events,
         }}}
         json.dump(buckets, f, indent=2)
-    # with open(fn+"_report.txt", "w") as f:
-    #     print(f"Saving result to {fn}.txt")
-    #     f.write(report(events, result, start, repo_url))
 
 def query(timeperiods):
     aw = aw_client.ActivityWatchClient()
@@ -300,16 +331,21 @@ def calc_time(timeperiods, repo_url):
     """ calculate total time worked in each time period """
     ok_idle_time = 60 * 5
     results = [generous_approx(w, ok_idle_time) for w in worked]
-    total = _pretty_timedelta(sum(results, timedelta()))
+    total = sum(results, timedelta())
+    print("\n")
     for i, (start, stop) in enumerate(timeperiods):
         if args.report: 
-            print(report(worked[i], results[i], start, repo_url), "\n")
+            rep = report(worked[i], results[i], start, repo_url)
+            if rep != "": print(rep)
         # if args.save: 
         #     save(worked[i], results[i], start, repo_url=args.repo, path=args.path or None)
+    if args.report:
+        from itertools import chain
+        print(report(list(chain.from_iterable(worked)), total, datetime.now(), args.repo, header=f"Total for {args.days} days"))
     if args.save:
         save(worked, timeperiods)
 
-    return (results, total)
+    return (results, _pretty_timedelta(total))
 
 
 
