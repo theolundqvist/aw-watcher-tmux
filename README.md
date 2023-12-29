@@ -1,5 +1,7 @@
-### Fork adds mac compatability.
+### Fork adds mac compatability and scripts to show spent time in current git repo and report generation.
 
+![image](https://github.com/theolundqvist/aw-watcher-tmux-editor/assets/31588188/0fc4735d-9ad2-47ee-b9ac-38016c84f8d7)
+![image](https://github.com/theolundqvist/aw-watcher-tmux-editor/assets/31588188/fa05dd3b-d936-4709-80d8-4de6f2a65339)
 
 
 
